@@ -4,7 +4,7 @@ function Landing() {
         <div className='relative w-1/2 bg-gradient-to-br from-indigo-500 to-purple-600 overflow-hidden'>
           <div className='absolute flex flex-col justify-center items-center text-center mx-24 inset-0 transform  bg-gradient-to-br from-indigo-500 to-purple-600'>
             <h1 className="text-8xl text-indigo-100 font-bold">OMI</h1>
-            <p className="text-indigo-200 text-xl">Lorem ipsum dolor sit amet consectetur adipisicing elit. Ea assumenda dolore dolorum ipsam officia laboriosam fugiat. Eos, tenetur autem dolor, accusantium voluptates at nihil nemo ratione neque</p>
+            <p className="text-indigo-200 text-xl">Lorem ipsum adipisicing elit. Ea assumenda dolore dolorum ipsam officia laboriosam fugiat. Eos, tenetur autem dolor, accusantium voluptates at nihil nemo ratione neque</p>
           </div>
         </div>
   
