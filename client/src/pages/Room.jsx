@@ -4,11 +4,11 @@ import React, { useEffect, useRef, useState } from 'react';
 const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false, placeholder = false }, ref) {
   return (
     <div className="relative flex items-center justify-center w-full aspect-square max-w-xs mx-auto">
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5  bg-black/60 text-xs text-white whitespace-nowrap">
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 bg-black/60 text-xs text-white whitespace-nowrap">
         {name}
       </div>
       {placeholder ? (
-        <div className="w-full h-full  bg-gray-700 flex items-center justify-center text-xs text-gray-300 select-none">
+        <div className="w-full h-full bg-gray-700 flex items-center justify-center text-xs text-gray-300 select-none">
           Waiting...
         </div>
       ) : (
@@ -16,7 +16,7 @@ const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false
           ref={ref}
           autoPlay
           playsInline
-          muted={mirror} 
+          muted={mirror}
           className={`w-full h-full rounded-sm object-cover bg-black ${mirror ? 'scale-x-[-1]' : ''}`}
         />
       )}
@@ -26,22 +26,21 @@ const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false
 
 function Room({ localName = 'You', remoteName = 'Stranger' }) {
   const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null); 
-
-  const [messages, setMessages] = useState([]); 
+  const remoteVideoRef = useRef(null);
+  const localStreamRef = useRef(null); 
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
 
   useEffect(() => {
-    let localStream;
-
     const startCamera = async () => {
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: false,
           audio: false,
         });
+        localStreamRef.current = stream;
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream;
+          localVideoRef.current.srcObject = stream;
         }
       } catch (error) {
         console.error('Error accessing camera:', error);
@@ -51,11 +50,21 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
     startCamera();
 
     return () => {
-      if (localStream) {
-        localStream.getTracks().forEach((t) => t.stop());
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
+
+  const closeCamera = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+    }
+  };
 
   const sendMessage = (e) => {
     e.preventDefault();
@@ -63,6 +72,8 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
     if (!text) return;
     setMessages((m) => [...m, { id: Date.now(), from: localName, text }]);
     setInput('');
+    socket.to.emit('chat', message)
+    
   };
 
   const handleSkip = () => {
@@ -76,6 +87,12 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
           <VideoBubble ref={localVideoRef} name={localName} mirror />
           <VideoBubble ref={remoteVideoRef} name={remoteName} placeholder />
         </div>
+        <button
+          type="button"
+          onClick={closeCamera}
+          className="px-5 py-2 rounded-md bg-rose-600 hover:bg-rose-700 active:scale-95 text-sm font-medium transition">
+          Close Camera
+        </button>
         <button
           type="button"
           onClick={handleSkip}
@@ -95,7 +112,9 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
             messages.map((msg) => (
               <div key={msg.id} className="flex flex-col">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">{msg.from}</span>
-                <span className="px-3 py-1.5 rounded-md bg-gray-700 text-gray-100 max-w-[90%] w-fit break-words">{msg.text}</span>
+                <span className="px-3 py-1.5 rounded-md bg-gray-700 text-gray-100 max-w-[90%] w-fit break-words">
+                  {msg.text}
+                </span>
               </div>
             ))
           )}

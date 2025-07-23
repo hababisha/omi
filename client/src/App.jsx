@@ -7,20 +7,26 @@ import {
   Navigate,
 } from 'react-router-dom';
 import Room from './pages/Room';
+import { useEffect } from 'react';
 
-const socket = io('http://localhost:3000')
+let socket;
 
 function App() {
+  useEffect(() => {
+    socket = io("http://localhost:3000")
+    return () => {
+      socket.disconnect()
+    }
+  }, [])
 
   return (
     <>
-    <Router>
-      <Routes>
-        <Route path="/" element={<Landing/>} />
-        <Route path="/room" element={<Room />} />
-      </Routes>
-    </Router>
-      
+      <Router>
+        <Routes>
+          <Route path="/" element={<Landing/>} />
+          <Route path="/room" element={<Room />} />
+        </Routes>
+      </Router>   
     </>
   )
 }
