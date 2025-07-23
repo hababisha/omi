@@ -8,16 +8,33 @@ const io = new Server(server, {
     cors: {
         origin: "http://localhost:5173"
       }
-}
+  }
 );
 
+let females = [];
+let males = [];
 
-app.get('/', (req, res) => {
-  res.send('<h1>Hello world</h1>');
-});
+io.on('connection', (socket) => {
+  console.log('user connected')
+  
+  socket.on('newStranger', (data) => {
+    let stranger = {
+      name : data.name,
+      sex : data.sex,
+      id : socket.id
+    }
 
-io.on("connection", (socket)=>{
-    console.log('user connected')
+    if (stranger.sex === "female") {
+      females.push(stranger)
+    }
+    else{
+      males.push(stranger)
+    }
+    console.log("females: ", females, "males: ", males)
+  })
+  socket.on('disconnect', (socket) => {
+    console.log('user disconnected')
+  })
 })
 
 server.listen(3000, () => {
