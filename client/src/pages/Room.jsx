@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
+const socket = io('http://localhost:3000');
 
 const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false, placeholder = false }, ref) {
   return (
@@ -24,10 +27,14 @@ const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false
   );
 });
 
-function Room({ localName = 'You', remoteName = 'Stranger' }) {
+function Room() {
+  const location = useLocation();
+  const { room, name: localName, sex } = location.state;
+
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const localStreamRef = useRef(null); 
+  const localStreamRef = useRef(null);
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
 
@@ -35,8 +42,8 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: false,
-          audio: false,
+          video: false, 
+          audio: false
         });
         localStreamRef.current = stream;
         if (localVideoRef.current) {
@@ -56,6 +63,32 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
     };
   }, []);
 
+  useEffect(() => {
+    socket.on('receive-chat', ({ from, text }) => {
+      setMessages((prev) => [...prev, { id: Date.now(), from, text }]);
+    });
+
+    return () => {
+      socket.off('receive-chat');
+    };
+  }, []);
+
+  const sendMessage = (e) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text) return;
+
+    setMessages((prev) => [...prev, { id: Date.now(), from: localName, text }]);
+
+    socket.emit('chat', {
+      room,
+      message: text,
+      from: localName
+    });
+
+    setInput('');
+  };
+
   const closeCamera = () => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -64,16 +97,6 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
         localVideoRef.current.srcObject = null;
       }
     }
-  };
-
-  const sendMessage = (e) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text) return;
-    setMessages((m) => [...m, { id: Date.now(), from: localName, text }]);
-    setInput('');
-    socket.to.emit('chat', message)
-    
   };
 
   const handleSkip = () => {
@@ -85,18 +108,22 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
       <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-4xl">
           <VideoBubble ref={localVideoRef} name={localName} mirror />
-          <VideoBubble ref={remoteVideoRef} name={remoteName} placeholder />
+          <VideoBubble ref={remoteVideoRef} name="Stranger" placeholder />
         </div>
+
         <button
           type="button"
           onClick={closeCamera}
-          className="px-5 py-2 rounded-md bg-rose-600 hover:bg-rose-700 active:scale-95 text-sm font-medium transition">
+          className="px-5 py-2 rounded-md bg-rose-600 hover:bg-rose-700 active:scale-95 text-sm font-medium transition"
+        >
           Close Camera
         </button>
+
         <button
           type="button"
           onClick={handleSkip}
-          className="px-5 py-2 rounded-md bg-rose-600 hover:bg-rose-700 active:scale-95 text-sm font-medium transition">
+          className="px-5 py-2 rounded-md bg-rose-600 hover:bg-rose-700 active:scale-95 text-sm font-medium transition"
+        >
           Skip
         </button>
       </div>
@@ -128,7 +155,8 @@ function Room({ localName = 'You', remoteName = 'Stranger' }) {
           />
           <button
             type="submit"
-            className="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-md text-sm font-medium text-white transition">
+            className="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-md text-sm font-medium text-white transition"
+          >
             Send
           </button>
         </form>

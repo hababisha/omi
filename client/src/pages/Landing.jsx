@@ -1,24 +1,26 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 
-let socket;
+let socket = io('http://localhost:3000');
 
 function Landing() {
+  let navigate = useNavigate();
   const [name, setName] = useState('');
   const [sex, setSex] = useState('');
+  const [room, setRoom] = useState('');
 
-  useEffect(() => {
-    socket = io('http://localhost:3000');
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  // useEffect(() => {
+  //   socket = io('http://localhost:3000');
+  //   return () => {
+  //     socket.disconnect();
+  //   };
+  // }, []);
 
   const handleMatching = (e) => {
     e.preventDefault();
-    // console.log(name, sex);
-    let data = 
-    socket.emit('newStranger', {name, sex});
+    socket.emit('newStranger', {room, name, sex});
+    navigate('/room', { state: {room, name, sex}})
   };
 
   return (
@@ -33,7 +35,13 @@ function Landing() {
       <div className='w-1/2 flex items-center justify-center bg-gray-100 p-6'>
         <form onSubmit={handleMatching} className='p-6 w-full max-w-xs flex flex-col gap-4'>
           <h2 className='text-xl font-bold text-gray-700 text-center'>Join Chat</h2>
-          <input
+           <input
+            type='text'
+            placeholder='room'
+            className='border rounded p-2 focus:outline-none focus:ring-2 focus:ring-indigo-400'
+            value={room}
+            onChange={(e) => setRoom(e.target.value)}
+          /><input
             type='text'
             placeholder='Enter your name'
             className='border rounded p-2 focus:outline-none focus:ring-2 focus:ring-indigo-400'
