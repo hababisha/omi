@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
-
-let socket = io('http://localhost:3000');
+import socket from "../socket";
 
 function Landing() {
   let navigate = useNavigate();
@@ -10,12 +8,7 @@ function Landing() {
   const [sex, setSex] = useState('');
   const [room, setRoom] = useState('');
 
-  // useEffect(() => {
-  //   socket = io('http://localhost:3000');
-  //   return () => {
-  //     socket.disconnect();
-  //   };
-  // }, []);
+  
 
   const handleMatching = (e) => {
     e.preventDefault();

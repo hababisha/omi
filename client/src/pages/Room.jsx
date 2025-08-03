@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { io } from 'socket.io-client';
-
-const socket = io('http://localhost:3000');
+import socket from '../socket';
 
 const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false, placeholder = false }, ref) {
   return (
@@ -137,6 +135,7 @@ function Room() {
             <p className="text-gray-400 text-center text-xs">Say hi to start chatting!</p>
           ) : (
             messages.map((msg) => (
+              
               <div key={msg.id} className="flex flex-col">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">{msg.from}</span>
                 <span className="px-3 py-1.5 rounded-md bg-gray-700 text-gray-100 max-w-[90%] w-fit break-words">

@@ -38,18 +38,15 @@ io.on('connection', (socket) => {
     console.log("females: ", females, "males: ", males)
 
     socket.on("chat", ({room, message, from}) => {
-      console.log('message from room: ', room, 'message: ', message)
+      console.log('message from room:', room, 'message:', message)
 
-      socket.to(room).emit('recieve-chat', {from, text: message})
+      socket.to(room).emit('receive-chat', {from, text: message})
     })
     socket.on('disconnect', (socket) => {
       console.log('user disconnected')
     })
 
-
   })
-  
-  
 })
 
 server.listen(3000, () => {
