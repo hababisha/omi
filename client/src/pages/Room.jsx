@@ -32,34 +32,41 @@ function Room() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localStreamRef = useRef(null);
+  const peerConnectionRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
 
-  useEffect(() => {
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: false, 
-          audio: false
-        });
-        localStreamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-      }
-    };
+  // useEffect(() => {
+  //   const RoomId = room
+  //   const pc = new RTCPeerConnection() 
+  //   peerConnectionRef.current = pc
 
-    startCamera();
+  //   const start = async () => {
+  //     try {
+  //       const stream = await navigator.mediaDevices.getUserMedia({
+  //         video: false, 
+  //         audio: false
+  //       });
 
-    return () => {
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
+  //       localStreamRef.current = stream;
+
+  //       if (localVideoRef.current) {
+  //         localVideoRef.current.srcObject = stream;
+  //       }
+
+  //       stream.getTracks().forEach((track) => {
+  //         pc.addTrack(track,stream)
+  //       })
+        
+  //       pc.ontrack = (event) => {
+  //         const [remoteStream] = event.streams
+  //         if (remoteVideoRef.current) {
+  //           remoteVideoRef.current.srcObject = remoteStream
+  //         }
+  //       }
+    
+  // }, []);
 
   useEffect(() => {
     socket.on('receive-chat', ({ from, text }) => {

@@ -12,37 +12,64 @@ const io = new Server(server, {
   }
 );
 
+
+let rooms = [];
 let females = [];
 let males = [];
 
 io.on('connection', (socket) => {
-  console.log('user connected:', socket.id)
+  // console.log('user connected:', socket.id)
   
   socket.on('newStranger', (data) => {
-    const {room, name, sex} = data;
-    let stranger = {
-      room,
+    const { name, sex} = data;
+
+    let stranger = { 
       name,
       sex,
       id: socket.id
     }
-    socket.join(room)
-    console.log(name, "joined room: ", room, " as sex ", sex)
 
-    if (sex == "female"){
-      females.push(stranger)
+    const matchAndJoin = (partner, current) => {
+      const room = `room-${partner.id}-${current.id}`
+      socket.join(room)
+      io.to(partner.id).socketsJoin(room)
+
+      io.to(current.id).emit('match', {room})
+      io.to(partner.id).emit('match', {room})
     }
-    else{
-      males.push(stranger)
+
+    if (sex === "male"){
+      if (females.length>0) {
+        const partner = females.shift()
+        matchAndJoin(partner,stranger)
+      } else{
+        males.push(stranger)
+      }
+    }else if(sex === "female"){
+      if (males.length >0) {
+        const partner = males.shift()
+        matchAndJoin(partner,stranger)
+
+      }else{
+        females.push(stranger)
+      }
     }
-    console.log("females: ", females, "males: ", males)
+
+    // socket.join(room)
+    // console.log(name, "joined room: ", room, " as sex ", sex)
+    
+    // console.log("females: ", females, "males: ", males)
 
     socket.on("chat", ({room, message, from}) => {
-      console.log('message from room:', room, 'message:', message)
+      // console.log('message from room:', room, 'message:', message)
 
       socket.to(room).emit('receive-chat', {from, text: message})
-    })
+    })  
+    
     socket.on('disconnect', (socket) => {
+      // console.log('user disconnected')
+      males = males.filter((user)=> user.id !== socket.id)
+      females = females.filter((user) => user.id !== socket.id)
       console.log('user disconnected')
     })
 
