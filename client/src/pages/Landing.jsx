@@ -20,8 +20,8 @@ function Landing() {
   };
 
   useEffect(() => {
-    socket.on('match', ({room}) => {
-      navigate('/room', {state: {room, name, sex}})
+    socket.on('match', ({room, localName, remoteName}) => {
+      navigate('/room', {state: {room, name: localName, remoteName, sex}})
     })
 
     return () => {

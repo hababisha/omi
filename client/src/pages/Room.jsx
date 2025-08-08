@@ -27,54 +27,161 @@ const VideoBubble = React.forwardRef(function VideoBubble({ name, mirror = false
 
 function Room() {
   const location = useLocation();
-  const { room, name: localName, sex } = location.state;
+  const { room, name: localName, remoteName, sex, initiator: initiatorFromServer } = location.state || {};
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const mountedRef = useRef(true);
+  const createdOfferRef = useRef(false);
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
 
-  // useEffect(() => {
-  //   const RoomId = room
-  //   const pc = new RTCPeerConnection() 
-  //   peerConnectionRef.current = pc
-
-  //   const start = async () => {
-  //     try {
-  //       const stream = await navigator.mediaDevices.getUserMedia({
-  //         video: false, 
-  //         audio: false
-  //       });
-
-  //       localStreamRef.current = stream;
-
-  //       if (localVideoRef.current) {
-  //         localVideoRef.current.srcObject = stream;
-  //       }
-
-  //       stream.getTracks().forEach((track) => {
-  //         pc.addTrack(track,stream)
-  //       })
-        
-  //       pc.ontrack = (event) => {
-  //         const [remoteStream] = event.streams
-  //         if (remoteVideoRef.current) {
-  //           remoteVideoRef.current.srcObject = remoteStream
-  //         }
-  //       }
-    
-  // }, []);
-
   useEffect(() => {
-    socket.on('receive-chat', ({ from, text }) => {
-      setMessages((prev) => [...prev, { id: Date.now(), from, text }]);
-    });
+    mountedRef.current = true;
+    createdOfferRef.current = false;
+
+    const pc = new RTCPeerConnection(); 
+    peerConnectionRef.current = pc;
+
+    pc.ontrack = (event) => {
+      if (!mountedRef.current) return;
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit('ice', { room, candidate: event.candidate });
+      }
+    };
+
+    const addLocalTracks = (stream) => {
+      if (!peerConnectionRef.current) return;
+      try {
+        stream.getTracks().forEach((track) => {
+          if (!peerConnectionRef.current) return;
+          if (peerConnectionRef.current.signalingState !== 'closed') {
+            peerConnectionRef.current.addTrack(track, stream);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to addTrack:', err);
+      }
+    };
+
+    // get user media first
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(async (stream) => {
+        if (!mountedRef.current) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+
+        localStreamRef.current = stream;
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+        addLocalTracks(stream);
+
+        const initiator = typeof initiatorFromServer !== 'undefined' ? initiatorFromServer : (sex === 'male');
+
+        if (initiator && !createdOfferRef.current) {
+          if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== 'closed') {
+            try {
+              createdOfferRef.current = true;
+              const offer = await peerConnectionRef.current.createOffer();
+              await peerConnectionRef.current.setLocalDescription(offer);
+              socket.emit('offer', { room, offer });
+            } catch (err) {
+              console.error('Error creating/sending offer:', err);
+            }
+          }
+        }
+      })
+      .catch(err => {
+        console.error('Error getting media devices', err);
+      });
+
+    const onOffer = async ({ offer }) => {
+      const currentPc = peerConnectionRef.current;
+      if (!currentPc || currentPc.signalingState === 'closed') {
+        console.warn('Received offer but pc is not available/closed.');
+        return;
+      }
+      try {
+        await currentPc.setRemoteDescription(new RTCSessionDescription(offer));
+        if (localStreamRef.current) {
+          const answer = await currentPc.createAnswer();
+          await currentPc.setLocalDescription(answer);
+          socket.emit('answer', { room, answer });
+        } else {
+          console.warn('No local stream when receiving offer; answer creation may be delayed.');
+        }
+      } catch (err) {
+        console.error('Error handling offer:', err);
+      }
+    };
+
+    const onAnswer = async ({ answer }) => {
+      const currentPc = peerConnectionRef.current;
+      if (!currentPc || currentPc.signalingState === 'closed') return;
+      try {
+        await currentPc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (err) {
+        console.error('Error handling answer:', err);
+      }
+    };
+
+    const onIce = async ({ candidate }) => {
+      const currentPc = peerConnectionRef.current;
+      if (!currentPc || currentPc.signalingState === 'closed') return;
+      try {
+        await currentPc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error('Error adding ICE candidate:', err);
+      }
+    };
+
+    socket.on('offer', onOffer);
+    socket.on('answer', onAnswer);
+    socket.on('ice', onIce);
 
     return () => {
-      socket.off('receive-chat');
+      mountedRef.current = false;
+
+      socket.off('offer', onOffer);
+      socket.off('answer', onAnswer);
+      socket.off('ice', onIce);
+
+      // stop local tracks
+      if (localStreamRef.current) {
+        try {
+          localStreamRef.current.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        localStreamRef.current = null;
+      }
+
+      // close peer connection
+      try {
+        if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== 'closed') {
+          peerConnectionRef.current.close();
+        }
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    };
+  }, [room, sex, initiatorFromServer]);
+
+  // chat handlers
+  useEffect(() => {
+    const onReceiveChat = ({ from, text }) => {
+      setMessages(prev => [...prev, { id: Date.now(), from, text }]);
+    };
+    socket.on('receive-chat', onReceiveChat);
+    return () => {
+      socket.off('receive-chat', onReceiveChat);
     };
   }, []);
 
@@ -82,30 +189,27 @@ function Room() {
     e.preventDefault();
     const text = input.trim();
     if (!text) return;
-
-    setMessages((prev) => [...prev, { id: Date.now(), from: localName, text }]);
-
-    socket.emit('chat', {
-      room,
-      message: text,
-      from: localName
-    });
-
+    setMessages(prev => [...prev, { id: Date.now(), from: localName, text }]);
+    socket.emit('chat', { room, message: text, from: localName });
     setInput('');
   };
 
   const closeCamera = () => {
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
-      }
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
     }
+    if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== 'closed') {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+    }
+    peerConnectionRef.current = null;
   };
 
   const handleSkip = () => {
-    console.log('Skip clicked');
+    console.log('skip clicked');
   };
 
   return (
@@ -113,16 +217,12 @@ function Room() {
       <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-4xl">
           <VideoBubble ref={localVideoRef} name={localName} mirror />
-          <VideoBubble ref={remoteVideoRef} name="Stranger" placeholder />
+          <VideoBubble
+            ref={remoteVideoRef}
+            name={remoteName}
+            placeholder={!remoteVideoRef.current || !remoteVideoRef.current.srcObject}
+          />
         </div>
-
-        <button
-          type="button"
-          onClick={closeCamera}
-          className="px-5 py-2 rounded-md bg-rose-600 hover:bg-rose-700 active:scale-95 text-sm font-medium transition"
-        >
-          Close Camera
-        </button>
 
         <button
           type="button"
@@ -142,7 +242,6 @@ function Room() {
             <p className="text-gray-400 text-center text-xs">Say hi to start chatting!</p>
           ) : (
             messages.map((msg) => (
-              
               <div key={msg.id} className="flex flex-col">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">{msg.from}</span>
                 <span className="px-3 py-1.5 rounded-md bg-gray-700 text-gray-100 max-w-[90%] w-fit break-words">
